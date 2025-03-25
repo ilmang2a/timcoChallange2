@@ -6,6 +6,8 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using timcoChallange2.Models;
+using System.Text;
+using System.IO;
 
 namespace CSVHelper
 {
@@ -13,6 +15,7 @@ namespace CSVHelper
     {
         private readonly ILogger<CSVHelper> _logger;
         private readonly List<Person> people;
+
 
 
         public CSVHelper(ILogger<CSVHelper> logger)
@@ -32,23 +35,32 @@ namespace CSVHelper
         {
 
 
+            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "text/csv");
+            response.Headers.Add("Content-Disposition", "attachment; filename=\"people.csv\"");
+
+
+            var memoryStream = new MemoryStream();
+
 
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                HasHeaderRecord = false,
+                HasHeaderRecord = true,
             };
 
             try
             {
-                string filePath = "C:\\Users\\admhamzatov\\source\\repos\\timcoChallange2\\CSV\\output.csv";
+                using (var streamWriter = new StreamWriter(memoryStream, Encoding.UTF8, 1024, leaveOpen: true))
 
-                using (var writer = new StreamWriter(filePath))
-                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                using (var csv = new CsvWriter(streamWriter, CultureInfo.InvariantCulture))
                 {
                     csv.WriteRecords(people);
-                }
+                    await streamWriter.FlushAsync();
 
-                _logger.LogInformation($"CSV file successfully written to {filePath}");
+                }
+                memoryStream.Position = 0;
+
+
             }
             catch (Exception ex)
             {
@@ -57,9 +69,7 @@ namespace CSVHelper
             }
 
 
-            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            await response.WriteAsJsonAsync(people);
-
+            await memoryStream.CopyToAsync(response.Body);
             return response;
         }
     }
