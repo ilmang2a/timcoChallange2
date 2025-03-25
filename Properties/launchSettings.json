@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "timcoChallange2": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7257",
+      "launchBrowser": false
+    }
+  }
+}
