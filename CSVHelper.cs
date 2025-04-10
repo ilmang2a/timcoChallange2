@@ -20,7 +20,7 @@ namespace CSVHelper
         }
 
         [Function("CSVHelperExport")]
-        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
         {
             var persons = await JsonSerializer.DeserializeAsync<List<Person>>(req.Body);
             if (persons == null || persons.Count == 0)
