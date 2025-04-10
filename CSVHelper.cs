@@ -1,37 +1,56 @@
-using CsvHelper.Configuration;
 using CsvHelper;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Logging;
 using System.Globalization;
 using timcoChallange2.Models;
-using System.Text;
-using System.IO;
 using System.Text.Json;
+using System.Net;
+using Microsoft.Extensions.Configuration;
+using CsvHelper.Configuration;
 
 namespace CSVHelper
 {
-    public class CSVHelper
+    public class CSVHelperExport
     {
-        private readonly ILogger<CSVHelper> _logger;
+        private readonly IConfiguration _config;
 
-
-
-        public CSVHelper(ILogger<CSVHelper> logger)
+        public CSVHelperExport(IConfiguration configuration)
         {
-
-            _logger = logger;
-
-
+            _config = configuration;
         }
 
-        [Function("CSVHelper")]
-        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "Post")] HttpRequestData req)
+        [Function("CSVHelperExport")]
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
-            var data = await JsonSerializer.DeserializeAsync<Person>(req.Body);
-            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            return response;
+            var persons = await JsonSerializer.DeserializeAsync<List<Person>>(req.Body);
+            if (persons == null || persons.Count == 0)
+            {
+                return req.CreateResponse(HttpStatusCode.BadRequest);
+            }
+
+            bool? includeHeader = _config.GetValue<bool?>("IncludeHeader");
+            if (includeHeader == null)
+            {
+                return req.CreateResponse(HttpStatusCode.BadRequest);
+            }
+
+            using Stream stream = new MemoryStream();
+            using var writer = new StreamWriter(stream);
+            using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = (bool)includeHeader,
+            });
+
+            csv.WriteRecords(persons);
+            csv.Flush();
+            stream.Position = 0;
+
+            var output = req.CreateResponse(HttpStatusCode.OK);
+            output.Headers.Add("Content-Type", "text/csv");
+            output.Headers.Add("Content-Disposition", "attachment; filename=persons.csv");
+            await stream.CopyToAsync(output.Body);
+            return output;
+
         }
     }
 }
